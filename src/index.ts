@@ -180,6 +180,57 @@ async function handleStatus(env: Env): Promise<Response> {
   }
 }
 
+// ─── Customer-site widget (served from /widget/trd-ai.js) ──────────
+// Inline so the worker is a single deploy unit. Keep in sync with
+// widget/trd-ai.js (the canonical source for editing).
+const TRD_WIDGET_JS = `// trd-ai.js — TRD Edge Mesh customer-site widget · v0.1.0
+(function(){
+  if (typeof window === 'undefined') return;
+  if (window.TRD) return;
+  var ENDPOINT_BASE = window.TRD_ENDPOINT || 'https://trd-edge-mesh.ndusadftb.workers.dev';
+  function getOrMakeVisitorId(){
+    try {
+      var KEY = 'trd_vid';
+      var v = window.localStorage.getItem(KEY);
+      if (!v || v.length < 8) {
+        v = 'v-' + Math.random().toString(36).slice(2,10) + Date.now().toString(36);
+        window.localStorage.setItem(KEY, v);
+      }
+      return v;
+    } catch(_) { return 'v-eph-' + Math.random().toString(36).slice(2,12); }
+  }
+  var visitorId = getOrMakeVisitorId();
+  function call(path, body) {
+    return fetch(ENDPOINT_BASE + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-TRD-Visitor-Id': visitorId },
+      body: JSON.stringify(body)
+    }).then(function(res){
+      return res.text().then(function(text){
+        var parsed;
+        try { parsed = JSON.parse(text); } catch(_) { parsed = { raw: text }; }
+        if (!res.ok) {
+          var err = new Error((parsed && parsed.error) || ('http_' + res.status));
+          err.status = res.status; err.body = parsed;
+          throw err;
+        }
+        return parsed;
+      });
+    });
+  }
+  function getJson(path){ return fetch(ENDPOINT_BASE + path).then(function(r){return r.json();}); }
+  window.TRD = {
+    visitorId: visitorId,
+    endpoint: ENDPOINT_BASE,
+    chat:     function(req){ return call('/_trd-ai/chat', req); },
+    complete: function(req){ return call('/_trd-ai/complete', req); },
+    embed:    function(req){ return call('/_trd-ai/embed', req); },
+    status:   function(){ return getJson('/_trd-ai/status'); },
+    health:   function(){ return getJson('/_trd-ai/health'); }
+  };
+})();
+`;
+
 // ─── Main entrypoint ────────────────────────────────────────────────
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -196,6 +247,18 @@ export default {
     // Health probe — no rate limit, no body
     if (url.pathname === '/_trd-ai/health') {
       return json({ ok: true, service: 'trd-edge-mesh', ts: Date.now() }, 200, cors);
+    }
+
+    // Widget JS — public, cacheable, served from the worker for one-line embed
+    if (url.pathname === '/widget/trd-ai.js' && req.method === 'GET') {
+      return new Response(TRD_WIDGET_JS, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/javascript; charset=utf-8',
+          'Cache-Control': 'public, max-age=300',
+          ...cors,
+        },
+      });
     }
 
     // Status (cached for 30s upstream)
