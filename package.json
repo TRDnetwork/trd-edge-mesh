@@ -1,0 +1,16 @@
+{
+  "name": "trd-edge-mesh",
+  "version": "0.1.0",
+  "description": "Cloudflare Worker that proxies end-customer site AI calls (chatbot, autocomplete, image-gen) to TRD's worker mesh instead of OpenAI/Anthropic. The reach play — TRD Compute reaches every visitor of every customer site.",
+  "private": true,
+  "scripts": {
+    "dev":    "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build":  "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240903.0",
+    "typescript": "^5.4.5",
+    "wrangler": "^3.78.0"
+  }
+}

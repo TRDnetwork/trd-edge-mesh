@@ -1,0 +1,16 @@
+name = "trd-edge-mesh"
+main = "src/index.ts"
+compatibility_date = "2026-05-17"
+
+# Custom-domain routing: when an end-customer site embeds the TRD widget,
+# the widget calls https://<their-site>/_trd-ai/* which Cloudflare routes
+# to this worker (transitively via the customer's *.trdn.io subdomain).
+[env.production]
+routes = [
+  { pattern = "*.trdn.io/_trd-ai/*", zone_name = "trdn.io" },
+]
+
+[vars]
+TRD_COMPUTE_API = "https://trd-cn-backend-production.up.railway.app"
+TRD_STORAGE_API = "https://api.storage.trdn.io"
+ALLOWED_ORIGINS = "*.trdn.io,*.pages.dev,*.vercel.app"
